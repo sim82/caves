@@ -154,25 +154,51 @@ pub fn character_move(
             bottom: pixel_coord.y() - 12.0,
         };
 
-        let mut intersects = false;
-        for shape in level.collision_shapes.iter() {
+        // let end_rect = math::Rect {
+        //     left: character_rect.left + d.x(),
+        //     right: pixel_coord.x() + 14.0 + d.x(),
+        //     top: pixel_coord.y() + d.y(),
+        //     bottom: pixel_coord.y() - 12.0 + d.y(),
+        // };
+
+        let range = math::Rect {
+            left: character_rect.left.min(character_rect.left + d.x()),
+            right: character_rect.right.max(character_rect.right + d.x()),
+            bottom: character_rect.bottom.min(character_rect.bottom + d.y()),
+            top: character_rect.top.max(character_rect.top + d.y()),
+        };
+
+        // coarse preselect
+        let candidate_shapes = level.collision_shapes.iter().filter_map(|shape| {
+            let level::CollisionShape::Rect(r1) = shape;
+
+            if movement::range_non_overlap(r1.left, r1.right, range.left, range.right)
+                || movement::range_non_overlap(r1.bottom, r1.top, range.bottom, range.top)
+            {
+                None
+            } else {
+                Some(shape)
+            }
+        });
+
+        // fin-grain collide with all candidates, find minimum possible movement dist
+        let mut dmin = 1.0f32;
+
+        for shape in candidate_shapes {
             match movement::try_move(shape, &character_rect, &d) {
-                movement::MoveRes::Complete(_) => continue,
-                movement::MoveRes::Collision(d_target, _, _, _) => {
-                    println!(
-                        "collision: {:?} {:?} {:?} {:?}",
-                        shape, character_rect, d, d_target
-                    );
-                    d = d_target;
-                    intersects = true;
-                    break;
+                movement::MoveRes::Complete(_) => (),
+                movement::MoveRes::Collision(d_target, dd, hit) => {
+                    println!("collision: {} {} {:?}", d, d_target, hit);
+                    dmin = dmin.min(dd);
                 }
                 movement::MoveRes::Stuck => {
                     println!("stuck! {:?} {:?}", shape, character_rect);
+                    panic!();
                 }
             }
         }
-        transform.translation += d.extend(0.0);
+
+        transform.translation += (d * dmin).extend(0.0);
     }
 }
 

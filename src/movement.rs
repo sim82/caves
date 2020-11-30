@@ -81,17 +81,19 @@ pub fn intersect_dist2(shape: &level::CollisionShape, rect: &math::Rect<f32>) ->
 #[derive(Debug, Clone)]
 pub enum MoveRes {
     Complete(Vec2),
-    Collision(Vec2, f32, bool, bool),
+    Collision(Vec2, f32, [bool; 4]),
     Stuck,
 }
 
 pub fn try_move(s1: &level::CollisionShape, r2: &Rect<f32>, d_target: &Vec2) -> MoveRes {
-    // let r1 = match s1 {
-    //     level::CollisionShape::Rect(r) => r,
-    //     // _ => panic!("not supported"),
-    // };
-
     let level::CollisionShape::Rect(r1) = s1;
+
+    let x_pos = d_target.x() > 0.0;
+    let x_neg = d_target.x() < 0.0;
+
+    let y_pos = d_target.y() > 0.0;
+    let y_neg = d_target.y() < 0.0;
+
     let xfree_start = range_non_overlap(r1.left, r1.right, r2.left, r2.right);
     let yfree_start = range_non_overlap(r1.bottom, r1.top, r2.bottom, r2.top);
 
@@ -111,33 +113,62 @@ pub fn try_move(s1: &level::CollisionShape, r2: &Rect<f32>, d_target: &Vec2) -> 
     if xfree_start && xfree_end || yfree_start && yfree_end {
         return MoveRes::Complete(*d_target);
     }
+    // println!(
+    //     "try_move: {} {} {:?} -> {:?} {:?}",
+    //     xfree_start, yfree_start, r2, r2_target, r1
+    // );
 
-    let d_int = intersect_dist2(s1, &r2_target);
-
-    // let d = *d_target + d_int;
-    // println!("d_int: {:?} {:?} {:?}", d_target, d_int, d);
-
-    let mut d = 0.0;
-    let mut collx = false;
-    let mut colly = false;
-    if d_target.x().abs() > f32::EPSILON && xfree_start && !xfree_end {
-        // collision on x axis
-        d = (d_target.x() + d_int.x()) / d_target.x();
-        collx = true;
-    }
-    if d_target.y().abs() > f32::EPSILON && yfree_start && !yfree_end {
-        // collision on y axis
-        let dy = (d_target.y() + d_int.y()) / d_target.y();
-        if d != 0.0 || dy < d {
-            d = dy;
+    let intx = match (xfree_start, xfree_end) {
+        (true, true) => 1.0,
+        (false, _) => 1.0,
+        (true, false) => {
+            if x_pos {
+                (r2_target.right - r1.left) / d_target.x()
+            } else if x_neg {
+                (r2_target.left - r1.right) / d_target.x()
+            } else {
+                1.0
+            }
         }
-        colly = true;
-    }
-    // if xfr
-    // d -= f32::EPSILON;
-    println!("d: {}", d);
+    };
 
-    MoveRes::Collision(*d_target * d, d, collx, colly)
+    let inty = match (yfree_start, yfree_end) {
+        (true, true) => 1.0,
+        (false, _) => 1.0,
+        (true, false) => {
+            if y_pos {
+                (r2_target.top - r1.bottom) / d_target.y()
+            } else if y_neg {
+                (r2_target.bottom - r1.top) / d_target.y()
+            } else {
+                1.0
+            }
+        }
+    };
+
+    // println!("int: {} {}", intx, inty);
+
+    let dx = 1.0 - intx;
+    let dy = 1.0 - inty;
+
+    let mut d = dx.max(dy);
+
+    if d < f32::EPSILON * 100.0 {
+        d = 0.0;
+    }
+
+    // println!("d: {} {} {}", dx, dy, d);
+
+    MoveRes::Collision(
+        *d_target * d,
+        d,
+        [
+            x_neg && !xfree_end,
+            x_pos && !xfree_end,
+            y_neg && !yfree_end,
+            y_pos && !yfree_end,
+        ],
+    )
 }
 
 #[test]
