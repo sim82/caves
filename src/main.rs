@@ -19,6 +19,7 @@ fn main() {
         .add_system(ferris::animate_character_system.system())
         .add_system(ferris::character_input.system())
         .add_system(ferris::character_move.system())
+        // .add_system(ferris::character_move_state.system())
         // .add_system(ferris::character_hit.system())
         // .add_system(ferris::character_intersect.system())
         .add_system(camera_movement.system())

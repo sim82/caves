@@ -35,6 +35,13 @@ pub fn animate_character_system(
             0
         };
         sprite.index = offset + anim_frame;
+
+        // let frame = &state.state.frames[state.state_step as usize];
+        // sprite.index = match state.face_dir {
+        //     Direction::West => frame.0,
+        //     Direction::East => frame.1,
+        //     _ => 0,
+        // } as u32;
     }
 }
 
@@ -80,14 +87,82 @@ impl Direction {
 }
 
 #[derive(Default)]
+struct Frame(i32, i32, i32, i32, u32);
+
+enum Think {
+    Walk,
+    Air,
+}
+
+impl Default for Think {
+    fn default() -> Self {
+        Think::Walk
+    }
+}
+
+enum React {
+    Walk,
+    Air,
+}
+
+#[derive(Default)]
+struct StateComplex {
+    frames: &'static [Frame],
+    think: Think,
+}
+
+const FERRIS_WALK: StateComplex = StateComplex {
+    frames: &[
+        Frame(0, 4, 4, 100, 1),
+        Frame(1, 5, 4, 100, 2),
+        Frame(2, 6, 4, 100, 3),
+        Frame(3, 7, 4, 100, 0),
+    ],
+    think: Think::Walk,
+};
+
+enum Movement {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+#[derive(Default)]
+pub struct InputState {
+    xaxis: Option<Movement>,
+    yaxis: Option<Movement>,
+}
+
 pub struct CharacterState {
+    input_state: InputState,
     velocity: Vec3,
     move_input: Option<Vec2>,
     face_dir: Direction,
     walk_speed: Option<f32>,
     frame: usize,
     hit: [bool; 4],
+    state: &'static StateComplex,
+    state_time_left: i32,
+    state_step: u32,
 }
+
+impl Default for CharacterState {
+    fn default() -> Self {
+        CharacterState {
+            state: &FERRIS_WALK,
+            input_state: InputState::default(),
+            velocity: Vec3::zero(),
+            move_input: None,
+            face_dir: Direction::default(),
+            walk_speed: None,
+            frame: 0,
+            hit: [false; 4],
+            state_time_left: 0,
+            state_step: 0,
+        }
+    }
+}
+
 pub fn character_input(
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<(&TextureAtlasSprite, &mut CharacterState)>,
@@ -101,16 +176,24 @@ pub fn character_input(
 
         state.walk_speed = None;
         state.velocity = Vec3::zero();
+        state.input_state.xaxis = None;
         if keyboard_input.pressed(KeyCode::A) {
             state.face_dir = Direction::West;
             state.walk_speed = Some(speed);
             *state.velocity.x_mut() = -speed;
+            state.input_state.xaxis = Some(Movement::Left);
         }
 
         if keyboard_input.pressed(KeyCode::D) {
             state.face_dir = Direction::East;
             state.walk_speed = Some(speed);
             *state.velocity.x_mut() = speed;
+            if state.input_state.xaxis.is_none() {
+                state.input_state.xaxis = Some(Movement::Right);
+            } else {
+                // left and right cancel out
+                state.input_state.xaxis = None;
+            }
         }
 
         if keyboard_input.pressed(KeyCode::S) {
@@ -122,6 +205,59 @@ pub fn character_input(
             state.walk_speed = Some(speed);
             *state.velocity.y_mut() = speed;
         }
+    }
+}
+
+pub fn character_move_state(
+    time: Res<Time>,
+    level: Res<Option<level::Level>>,
+    mut query: Query<(&mut Transform, &mut CharacterState)>,
+) {
+    let level = match *level {
+        Some(ref level) => level,
+        None => return,
+    };
+
+    for (mut transform, mut state) in query.iter_mut() {
+        state.move_input = None;
+
+        let d_ms = (time.delta_seconds * 1000.0) as i32;
+        let mut movex = 0;
+
+        state.state_time_left -= d_ms;
+        println!("time: {} {}", state.state_time_left, d_ms);
+        while state.state_time_left <= 0 {
+            state.state_step = state.state.frames[state.state_step as usize].4;
+            let Frame(sl, sr, x, time, next) = &state.state.frames[state.state_step as usize];
+            state.state_time_left += time;
+            movex += match state.input_state.xaxis {
+                Some(Movement::Left) => -x,
+                Some(Movement::Right) => *x,
+                _ => 0,
+            };
+            // movex += state.state_time_left += statec.frames[state.state_step as usize].3;
+        }
+        println!("move: {}", movex);
+        let pixel_coord = transform.translation.truncate();
+        // let mut d = (state.velocity * 128.0 * time.delta_seconds).truncate();
+        let new_pixel_coord = pixel_coord + Vec2::new(movex as f32, 0.0);
+        let probe_pos = new_pixel_coord + Vec2::new(8.0, -14.0);
+
+        let mut on_ground = false;
+
+        for shape in level.collision_shapes.iter() {
+            let level::CollisionShape::Rect(r1) = shape;
+            if probe_pos.x() >= r1.left
+                && probe_pos.x() <= r1.right
+                && probe_pos.y() >= r1.bottom
+                && probe_pos.y() <= r1.top
+            {
+                // println!("ground height: {}", r1.top);
+                // if r1.top >=
+            }
+        }
+
+        transform.translation += (new_pixel_coord - pixel_coord).extend(0.0);
     }
 }
 
@@ -199,6 +335,78 @@ pub fn character_move(
         }
 
         transform.translation += (d * dmin).extend(0.0);
+    }
+}
+
+pub fn character_move_single(
+    time: Res<Time>,
+    level: Res<Option<level::Level>>,
+    mut query: Query<(&mut Transform, &mut CharacterState)>,
+) {
+    let level = match *level {
+        Some(ref level) => level,
+        None => return,
+    };
+
+    for (mut transform, mut state) in query.iter_mut() {
+        state.move_input = None;
+        // match state.walk_speed {
+        //     Some(speed) if state.hit[Direction::South.index()] => {
+        //         state.move_input = Some(state.face_dir.to_vec() * speed)
+        //     }
+        //     _ => (),
+        // }
+
+        let pixel_coord = transform.translation.truncate();
+        let mut d = (state.velocity * 128.0 * time.delta_seconds).truncate();
+        let new_pixel_coord = pixel_coord + d;
+        let probe_pos = new_pixel_coord + Vec2::new(8.0, -14.0);
+
+        let mut on_ground = false;
+
+        for shape in level.collision_shapes.iter() {
+            let level::CollisionShape::Rect(r1) = shape;
+            if probe_pos.x() >= r1.left
+                && probe_pos.x() <= r1.right
+                && probe_pos.y() >= r1.bottom
+                && probe_pos.y() <= r1.top
+            {
+                // println!("ground height: {}", r1.top);
+                // if r1.top >=
+            }
+        }
+
+        // // coarse preselect
+        // let candidate_shapes = level.collision_shapes.iter().filter_map(|shape| {
+        //     let level::CollisionShape::Rect(r1) = shape;
+
+        //     if movement::range_non_overlap(r1.left, r1.right, range.left, range.right)
+        //         || movement::range_non_overlap(r1.bottom, r1.top, range.bottom, range.top)
+        //     {
+        //         None
+        //     } else {
+        //         Some(shape)
+        //     }
+        // });
+
+        // // fin-grain collide with all candidates, find minimum possible movement dist
+        // let mut dmin = 1.0f32;
+
+        // for shape in candidate_shapes {
+        //     match movement::try_move(shape, &character_rect, &d) {
+        //         movement::MoveRes::Complete(_) => (),
+        //         movement::MoveRes::Collision(d_target, dd, hit) => {
+        //             println!("collision: {} {} {:?}", d, d_target, hit);
+        //             dmin = dmin.min(dd);
+        //         }
+        //         movement::MoveRes::Stuck => {
+        //             println!("stuck! {:?} {:?}", shape, character_rect);
+        //             panic!();
+        //         }
+        //     }
+        // }
+
+        transform.translation += (d).extend(0.0);
     }
 }
 
