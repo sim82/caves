@@ -62,6 +62,22 @@
     "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 16 },
     "sourceSize": { "w": 16, "h": 16 },
     "duration": 100
+   },
+   "ferris2.0 8.aseprite": {
+    "frame": { "x": 128, "y": 0, "w": 16, "h": 16 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 16 },
+    "sourceSize": { "w": 16, "h": 16 },
+    "duration": 100
+   },
+   "ferris2.0 9.aseprite": {
+    "frame": { "x": 144, "y": 0, "w": 16, "h": 16 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 16, "h": 16 },
+    "sourceSize": { "w": 16, "h": 16 },
+    "duration": 100
    }
  },
  "meta": {
@@ -69,11 +85,11 @@
   "version": "1.2.25-x64",
   "image": "ferris2.0.png",
   "format": "RGBA8888",
-  "size": { "w": 128, "h": 16 },
+  "size": { "w": 160, "h": 16 },
   "scale": "1",
   "frameTags": [
+   { "name": "Loop", "from": 0, "to": 7, "direction": "forward" },
    { "name": "walk left", "from": 0, "to": 3, "direction": "forward" },
-   { "name": "Loop", "from": 0, "to": 3, "direction": "forward" },
    { "name": "walk right", "from": 4, "to": 7, "direction": "forward" }
   ],
   "layers": [

@@ -64,13 +64,14 @@ impl Direction {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Frame(i32, i32, i32, i32, u32);
 
 #[derive(Debug)]
 enum Think {
     Walk,
     Air,
+    Stand,
 }
 
 impl Default for Think {
@@ -79,9 +80,11 @@ impl Default for Think {
     }
 }
 
+#[derive(Debug)]
 enum React {
     Walk,
     Air,
+    Stand,
 }
 
 impl Default for React {
@@ -90,12 +93,18 @@ impl Default for React {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct StateComplex {
     frames: &'static [Frame],
     think: Think,
     react: React,
 }
+
+const FERRIS_STAND: StateComplex = StateComplex {
+    frames: &[Frame(0, 4, 0, 100, 0)],
+    think: Think::Stand,
+    react: React::Stand,
+};
 
 const FERRIS_WALK: StateComplex = StateComplex {
     frames: &[
@@ -109,11 +118,12 @@ const FERRIS_WALK: StateComplex = StateComplex {
 };
 
 const FERRIS_JUMP: StateComplex = StateComplex {
-    frames: &[Frame(0, 4, 4, 100, 0)],
+    frames: &[Frame(8, 9, 0, 100, 0)],
     think: Think::Air,
     react: React::Air,
 };
 
+#[derive(Clone)]
 enum Movement {
     Up,
     Down,
@@ -194,7 +204,7 @@ pub fn character_move_state(
 
     for (mut transform, mut state) in query.iter_mut() {
         let d_ms = (time.delta_seconds * 1000.0) as i32;
-        let mut movex = 0;
+        let mut movex = 0f32;
         let mut movey = 0f32;
         state.state_time_left -= d_ms;
         println!("time: {} {}", state.state_time_left, d_ms);
@@ -209,7 +219,7 @@ pub fn character_move_state(
                 Some(Movement::Left) => -x,
                 Some(Movement::Right) => *x,
                 _ => 0,
-            };
+            } as f32;
             // movex += state.state_time_left += statec.frames[state.state_step as usize].3;
         }
 
@@ -227,10 +237,22 @@ pub fn character_move_state(
             Think::Walk => {
                 // println!("walk")
                 if state.input_state.jump {
-                    state.speed.set_y(10.0);
+                    state.speed.set_y(100.0);
                     state.state = &FERRIS_JUMP;
                     state.state_step = 0;
                     state.state_time_left = FERRIS_JUMP.frames[0].3;
+                    movey += state.speed.y() * time.delta_seconds;
+                    let runjump_speed = 32f32;
+                    let speed = match state.input_state.xaxis {
+                        Some(Movement::Left) => -runjump_speed,
+                        Some(Movement::Right) => runjump_speed,
+                        _ => 0f32,
+                    };
+                    state.speed.set_x(speed);
+                } else if state.input_state.xaxis.is_none() {
+                    state.state = &FERRIS_STAND;
+                    state.state_step = 0;
+                    state.state_time_left = FERRIS_STAND.frames[0].3;
                 }
             }
             Think::Air => {
@@ -239,12 +261,38 @@ pub fn character_move_state(
                 if state.speed.y() > -50.0 {
                     *state.speed.y_mut() -= 5.0;
                 }
+
+                match state.input_state.xaxis.clone() {
+                    Some(movement) => do_accel_x(&mut state.speed, &movement),
+                    None => do_friction_x(&mut state.speed),
+                }
+
+                // match state.input_state.xaxis {
+                //     Some(Movement::Left) => *state.speed.x_mut() -= 4f32,
+                //     Some(Movement::Right) => *state.speed.x_mut() += 4f32,
+                //     _ => *state.speed.x_mut() *= 0.5,
+                // }
+                movex += state.speed.x() * time.delta_seconds;
+                movey += state.speed.y() * time.delta_seconds;
+            }
+            Think::Stand => {
+                if state.input_state.jump {
+                    state.speed.set_y(100.0);
+                    state.state = &FERRIS_JUMP;
+                    state.state_step = 0;
+                    state.state_time_left = FERRIS_JUMP.frames[0].3;
+                    movey += state.speed.y() * time.delta_seconds;
+                } else if state.input_state.xaxis.is_some() {
+                    state.state = &FERRIS_WALK;
+                    state.state_step = 0;
+                    state.state_time_left = FERRIS_WALK.frames[0].3;
+                }
             }
         }
 
         println!(
-            "move: {} {} speed {:?} think: {:?}",
-            movex, movey, state.speed, state.state.think
+            "move: {} {} speed {:?} {:?} {} think: {:?}",
+            movex, movey, state.speed, state.state, state.state_step, state.state.think
         );
         // let pixel_coord = transform.translation.truncate();
         // let mut d = (state.velocity * 128.0 * time.delta_seconds).truncate();
@@ -288,7 +336,40 @@ pub fn character_move_state(
                     state.speed.set_y(0.0);
                 }
             }
+            React::Stand => {}
         }
+    }
+}
+
+fn do_friction_x(speed: &mut Vec2) -> () {
+    let decel = 1f32;
+    if speed.x().abs() <= decel {
+        speed.set_x(0f32)
+    } else if speed.x() > 0.0 {
+        *speed.x_mut() -= decel
+    } else if speed.x() < 0.0 {
+        *speed.x_mut() += decel
+    }
+}
+
+fn do_accel_x(speed: &mut Vec2, movement: &Movement) -> () {
+    let accel = 4.0;
+    let maxspeed = 32.0;
+    let x = speed.x_mut();
+    match movement {
+        Movement::Right => {
+            *x += accel;
+            if *x > maxspeed {
+                *x = maxspeed;
+            }
+        }
+        Movement::Left => {
+            *x -= accel;
+            if *x < -maxspeed {
+                *x = -maxspeed;
+            }
+        }
+        _ => (),
     }
 }
 
@@ -300,7 +381,7 @@ pub(crate) fn spawn(
     // let texture_handle = asset_server.load("gabe-idle-run.png");
     // let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(24.0, 24.0), 7, 1);
     let texture_handle = asset_server.load("ferris2.0.png");
-    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(16.0, 16.0), 8, 1);
+    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(16.0, 16.0), 10, 1);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
 
     commands
