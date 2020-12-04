@@ -1,7 +1,7 @@
 use bevy::math;
 use bevy::{prelude::*, render::camera::Camera};
 // use bevy_tiled_prototype::level;
-use super::{level, movement};
+use super::{level, movement, spritesheet};
 use bevy_tiled_prototype::TiledMapCenter;
 
 pub fn animate_character_system(
@@ -203,6 +203,7 @@ pub fn character_move_state(
     };
 
     for (mut transform, mut state) in query.iter_mut() {
+        println!("dtime: {:?}", time.delta);
         let d_ms = (time.delta_seconds * 1000.0) as i32;
         let mut movex = 0f32;
         let mut movey = 0f32;
@@ -380,6 +381,7 @@ pub(crate) fn spawn(
 ) -> () {
     // let texture_handle = asset_server.load("gabe-idle-run.png");
     // let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(24.0, 24.0), 7, 1);
+    let desc: Handle<spritesheet::Spritesheet> = asset_server.load("ferris2.0.json");
     let texture_handle = asset_server.load("ferris2.0.png");
     let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(16.0, 16.0), 10, 1);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);

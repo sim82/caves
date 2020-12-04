@@ -866,10 +866,12 @@ checksum = "631ae5198c9be5e753e5cc215e1bd73c2b466a3565173db433f52bb9d3e66dba"
 name = "caves"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "approx",
  "bevy",
  "bevy_tiled_prototype",
  "bevy_type_registry",
+ "serde_json",
  "tiled",
 ]
 

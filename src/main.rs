@@ -5,6 +5,7 @@ use bevy_tiled_prototype::TiledMapCenter;
 mod ferris;
 mod level;
 mod movement;
+mod spritesheet;
 
 #[macro_use]
 extern crate approx;
