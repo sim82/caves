@@ -6,14 +6,27 @@ use bevy_tiled_prototype::TiledMapCenter;
 
 pub fn animate_character_system(
     texture_atlases: Res<Assets<TextureAtlas>>,
+    spritesheet_assets: Res<Assets<spritesheet::Spritesheet>>,
     mut query: Query<(
         &mut Timer,
         &mut TextureAtlasSprite,
         &Handle<TextureAtlas>,
         &mut CharacterState,
+        &Handle<spritesheet::Spritesheet>,
     )>,
 ) {
-    for (timer, mut sprite, texture_atlas_handle, mut state) in query.iter_mut() {
+    for (timer, mut sprite, texture_atlas_handle, mut state, sprite_sheet) in query.iter_mut() {
+        let sprite_sheet = spritesheet_assets.get(sprite_sheet);
+
+        if sprite_sheet.is_none() {
+            continue;
+        }
+        let sprite_sheet = sprite_sheet.unwrap();
+        for (name, range) in sprite_sheet.ranges.iter() {
+            println!("{}: {:?}", name, range);
+        }
+        // sprite_sheet.
+
         let frame = &state.state.frames[state.state_step as usize];
         sprite.index = match state.face_dir {
             Direction::West => frame.0,
@@ -397,5 +410,6 @@ pub(crate) fn spawn(
             ..Default::default()
         })
         .with(Timer::from_seconds(0.1, true))
-        .with(CharacterState::default());
+        .with(CharacterState::default())
+        .with(desc);
 }

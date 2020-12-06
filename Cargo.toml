@@ -13,4 +13,6 @@ bevy = "^0.3"
 bevy_type_registry = "^0.3"
 tiled = "^0.9"
 approx = "^0.4"
+serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
+env_logger = "^0.8"

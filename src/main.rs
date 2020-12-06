@@ -9,11 +9,15 @@ mod spritesheet;
 
 #[macro_use]
 extern crate approx;
+#[macro_use]
+extern crate serde;
 
 fn main() {
+    env_logger::init();
     App::build()
         .add_plugins(DefaultPlugins)
         .add_plugin(bevy_tiled_prototype::TiledMapPlugin)
+        .add_plugin(spritesheet::SpritesheetPlugin)
         .add_startup_system(setup.system())
         .add_system(level::process_loaded_tile_maps2.system())
         .init_resource::<Option<level::Level>>()
@@ -48,7 +52,7 @@ fn setup(
             transform: Transform::from_scale(Vec3::new(0.25, 0.25, 1.0)),
             ..Default::default()
         });
-
+    asset_server.watch_for_changes().unwrap();
     ferris::spawn(commands, asset_server, texture_atlases);
 }
 
